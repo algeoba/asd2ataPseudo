@@ -1,0 +1,499 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- -->
+<!--
+	Данный файл представляет собой псевдокод-основу для формирования файлов XQ либо XSL, а также управляющего их запуском скрипта, выполняющих преобразования пакета файлов, сформированных по S1000D-4.1.A (этот стандарт в этом файле также обозначается через аббревиатуру ASD), в публикацию по ATA iSpec 2200 (или АТА). 
+	Данный файл сформирован на основе присланного файла по АТА (BDTS-D.xml), который был подвергнут следующим преобразованиям:
+		-	удалена разметка ATIPL (Arbortext);
+		-	типовые фрагменты уникального содержания заменены на самозакрывающиеся теги с префиксом asd2ata:
+			*	asd2ataColspecs : группа элементов COLSPEC,
+			*	asd2ataTgroup : элемент TGROUP и вложенные в него элементы,
+			*	asd2ataTbody : элемент TBODY и вложенные в него элементы,
+			*	asd2ataRows : элементы ROW и вложенные в него элементы,
+			*	asd2ataRecursive : результат применения алгоритма рекурсивной обработки элементов levelledPara и proceduralStep уровня вложенности >1 относительно элементов description и mainProcedure соответственно - см. в конце данного файла;
+		-	значения всех атрибутов, а также элементов TITLE / PARA, заменены на переменные, объявленные ниже.
+		
+		
+-->
+<?xml-stylesheet href="Стиль Раздела.style" type="text/x-styler" media="editor" alternate="yes"?>
+<?xml-stylesheet href="sca-amm-2.style" type="text/x-fosi" media="print,pdf" alternate="yes"?>
+
+<!-- 
+	ПЕРЕМЕННЫЕ
+	
+	ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+	$container : содержимое файла в пакете файлов по S1000D, у которого значение атрибута "/dmodule/@xsi:noNamespaceSchemaLocation" оканчивается на "container.xsd";
+	$brandName : задается вручную, в присланном файле по АТА: "RRJ";
+	$brandExtenstion : задается вручную, в присланном файле по АТА: "95";
+	$publicationName : задается вручную, в присланном файле по АТА: "РУКОВОДСТВО ПО ТЕХНИЧЕСКОЙ ЭКСПЛУАТАЦИИ КОМПОНЕНТА";
+	$publicationType : задается вручную, в присланном файле по АТА: "CMM";
+
+	$currentDocument : содержимое текущего документа (файла XML по S1000D), определяемого в составе входного пакета по различным условиям;
+	$currentFragment : определяемый запросом XPath текущий фрагмент в рамках текущего документа - для этого фрагмента выполняется соответствующий цикл;
+		
+	ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ ОПРЕДЕЛЕНИЯ ЗНАЧЕНИЯ АТРИБУТОВ ЭЛЕМЕНТОВ ПО DTD 
+
+	- ЗАДАВАЕМЫЕ ВРУЧНУЮ
+		$alunqi : задается вручную - уникальный идентификатор авиакомпании (Airline unique identifier); в присланном XML по АТА, скорее всего, ошибка: совпадает со значением атрибута chapnbr в пяти случаях и в одном случае - пустая строка
+
+	- ПРЕДСТАВЛЯЮЩИЕ СОБОЙ РЕЗУЛЬТАТ ВЫПОЛНЕНИЯ XPATH
+		$bookname : $container//dmAddressItems/dmTitle/techName; 
+			также в данном файле эта переменная используется для определения текстового содержания элемента TITLE
+		$chapnbr : $container//dmAddress//dmCode/@systemCode
+
+	- ПРЕДСТАВЛЯЮЩИЕ СОБОЙ КОНКАТЕНАЦИЮ НЕСКОЛЬКИХ ПЕРЕМЕННЫХ
+
+	- ПРЕДСТАВЛЯЮЩИЕ СОБОЙ РЕЗУЛЬТАТ ВЫПОЛНЕНИЯ ФУНКЦИИ
+	
+
+!!!		$chg : 
+		$docnbr : задается вручную
+!!!		$effrg : 
+!!!		$efftext : 
+!!!		$func : 
+!!!		$gnbr : 
+!!!		$id : идентификатор таблицы, результат выполнения функции, принимающей следующие аргументы и возвращающей конкатенацию следующих их преобразований (результат преобразования дается после =>):
+			* "TAB"
+			* $brandName
+			* $publicationType
+			
+!!!		$key : уникальный идентификатор элемента (кроме таблиц), результат выполнения функции, принимающей следующие аргументы и возвращающей конкатенацию следующих их преобразований (результат преобразования дается после =>):
+			* имя элемента-родителя => первые три буквы имени, приведенные к верхнему регистру
+			
+			
+		$model : результат конкатенации следующих значений:
+			* $brandName
+			* $brandExtenstion
+		$pgblknbr : номер очередного элемента PGBLK, если это атрибут элемента PGBLK, либо номер текущего элемента PGBLK, если это атрибут элемента TASK или SUBTASK, являющегося потомком соответствующего элемента  PGBLK
+			В присланном файле по АТА значения этого атрибута употребляются непоследовательно и не в соответствии со стандартом (п. {CMM, CMMIPL } Element: pgblk(444), также стр. 425-426). Возможно формирование алгоритма на основе таблиц соответствий типа излагаемой информации и начального значения нумерации элементов PGBLK, содержащего информацию соответствующего типа. Возможно, временным решением может стать присвоение атрибуту PGBLKNBR очередного элемента PGBLK значения отдельного счетчика элементов PGBLK, а атрибуту PGBLKNBR элементов TASK или SUBTASK значения элемента PGBLK, потомками которых они являются.
+			В присланном файле по АТА некоторые элементы GRAPHIC имеют атрибут PGBLKNBR, а некоторые не имеют. Стандарт АТА не определяет для элемента GRAPHIC атрибут PGBLKNBR как обязательный (в отличие от элементов PGBLK, TASK, SUBTASK ) поэтому данным файлом атрибут PGBLKNBR для элемента GRAPHIC не предусматривается.
+		$revdate : результат конкатенации следующих значений: 
+			* $container//dmAddressItems/issueDate/@month со словесным представлением месяца (на основании массива или иным способом)
+			* пробел ' '
+			* $container//dmAddressItems/issueDate/@day
+			* слэш '/'
+			* $container//dmAddressItems/issueDate/@year с дополнительным преобразованием для двузначного представления года
+		$revyear : $container//dmAddressItems/issueDate/@year
+!!!		$sectnbr : 
+!!!		$seq : 
+!!!		$sheetnbr : 
+!!!		$subjnbr : 
+
+
+
+
+-->
+
+<chapter chg="_CHG" key="CHARRJCMM_" revdate="$revdate" xmlns:atipl="http://www.arbortext.com/namespace/PageLayout">
+	<effect efftext="$container/dmodule/identAndStatusSection/dmStatus/applic/assert/@applicPropertyValues"/>
+	<title>$publicationName</title>
+	<chapterfm model="$model" docnbr="$docnbr" revyear="$revyear" bookname="$bookname"> .</chapterfm>
+	<chglist>
+		<!--... ЛИСТ РЕГИСТРАЦИИ ИЗМЕНЕНИЙ-->
+			<!-- 
+				Результат выполнения функции, аналогичной 
+				<xsl:copy-of select="//table[1]"/>
+				над файлом, имеющим infoCode="003"
+			-->
+	</chglist>
+	<eplist>
+		<!--... ПЕРЕЧЕНЬ ДЕЙСТВУЮЩИХ СТРАНИЦ-->
+			<!-- 
+				Результат выполнения функции, аналогичной 
+				<xsl:copy-of select="//table[1]"/>
+				над файлом, имеющим infoCode="002"
+			-->
+	</eplist>
+	<chatoc>
+		<!--... СОДЕРЖАНИЕ-->
+			<!-- 
+				Результат выполнения функции, аналогичной 
+				<xsl:copy-of select="//table[1]"/>
+				над файлом, имеющим infoCode="009"
+			-->
+	</chatoc>
+	<section asd2ata="abbrev" chapnbr="$chapnbr" sectnbr="$sectnbr" chg="N" key="SECRRJСMM284305A01R" revdate="$revdate">
+		<title>ПЕРЕЧЕНЬ АББРЕВИАТУР</title>
+		<subject chapnbr="$chapnbr" sectnbr="$sectnbr" subjnbr="$subjnbr" chg="N" key="SUBRRJCMM284305A01R" revdate="$revdate">
+			<title>ПЕРЕЧЕНЬ АББРЕВИАТУР</title>
+			<pgblk chapnbr="$chapnbr" sectnbr="$sectnbr" subjnbr="$subjnbr" pgblknbr="$pgblknbr" chg="N" key="SDSRRJCMM284305A01R" revdate="$revdate">
+!!!				<effect effrg="" efftext=""/>
+				<title/>
+				<prclist1>
+					<prcitem1>
+						<prcitem>
+							<title>ПЕРЕЧЕНЬ АББРЕВИАТУР</title>
+							<!-- 
+								Результат выполнения функции, аналогичной 
+								<xsl:copy-of select="//table[1]"/>
+								над файлом, имеющим infoCode="005"
+							-->
+						</prcitem>
+					</prcitem1>
+				</prclist1>
+			</pgblk>
+		</subject>
+	</section>
+	<section asd2ata="intro" chapnbr="$chapnbr" sectnbr="$sectnbr" chg="N" key="SECRRJСMM284305A01R" revdate="$revdate">
+		<title>ВВЕДЕНИЕ</title>
+		<subject chapnbr="$chapnbr" sectnbr="$sectnbr" subjnbr="$subjnbr" chg="N" key="SUBRRJCMM284305A01R" revdate="$revdate">
+			<title>ВВЕДЕНИЕ</title>
+			<pgblk chapnbr="$chapnbr" sectnbr="$sectnbr" subjnbr="$subjnbr" pgblknbr="$pgblknbr" chg="N" key="SDSRRJCMM284305A01R" revdate="$revdate">
+				<effect effrg="" efftext=""/>
+				<title/>
+				<prclist1>
+					<prcitem1>
+						<prcitem>
+							<title>Общие сведения</title>
+!!!							<asd2ataRecursive/>
+						</prcitem>
+					</prcitem1>
+				</prclist1>
+			</pgblk>
+		</subject>
+	</section>
+	<section asd2ata="descrNoper" chapnbr="$chapnbr" sectnbr="$sectnbr" chg="N" key="SECRRJCMM284305A01R" revdate="$revdate">
+		<title>ОПИСАНИЕ И РАБОТА</title>
+		<subject chapnbr="$chapnbr" sectnbr="$sectnbr" subjnbr="$subjnbr" chg="N" key="SECRRJCMM284305A01R" revdate="$revdate">
+			<title>ОПИСАНИЕ И РАБОТА</title>
+			<pgblk chapnbr="$chapnbr" sectnbr="$sectnbr" subjnbr="$subjnbr" pgblknbr="$pgblknbr" chg="N" key="SECRRJCMM284305A01R" revdate="$revdate">
+				<effect effrg="" efftext=""/>
+				<title/>
+				<prclist1>
+					<prcitem1>
+						<prcitem>
+							<title>Назначение</title>
+!!!							<asd2ataRecursive/>
+						</prcitem>
+					</prcitem1>
+					<prcitem1>
+						<prcitem>
+							<title>Технические данные</title>
+!!!							<asd2ataRecursive/>
+						</prcitem>
+					</prcitem1>
+					<prcitem1>
+						<prcitem>
+							<title>Описание конструкции</title>
+!!!							<asd2ataRecursive/>
+						</prcitem>
+					</prcitem1>
+					<prcitem1>
+						<prcitem>
+							<title>Состав</title>
+!!!							<asd2ataRecursive/>
+						</prcitem>
+					</prcitem1>
+					<prcitem1>
+						<prcitem>
+							<title>Работа</title>
+!!!							<asd2ataRecursive/>
+						</prcitem>
+					</prcitem1>
+				</prclist1>
+			</pgblk>
+		</subject>
+	</section>
+	<section asd2ata="jobCharts" chapnbr="$chapnbr" sectnbr="$sectnbr" chg="N" key="SECRRJСMM2843A01R" revdate="$revdate">
+		<title>ОБСЛУЖИВАНИЕ КОМПОНЕНТА В ЭКСПЛУАТАЦИИ</title>
+		<subject chapnbr="$chapnbr" sectnbr="$sectnbr" subjnbr="00" chg="N" key="SUBRRJСMM284305A01R" revdate="$revdate">
+			<title>ОБСЛУЖИВАНИЕ КОМПОНЕНТА В ЭКСПЛУАТАЦИИ</title>
+			<pgblk chapnbr="$chapnbr" sectnbr="$sectnbr" subjnbr="$subjnbr" pgblknbr="$pgblknbr" chg="N" key="SDSRRJСMM284305A01R" revdate="$revdate">
+!!!				<effect effrg="" efftext=""/>
+				<title/>
+				<prclist1>
+					<prcitem1>
+						<prcitem>
+							<title>ОБСЛУЖИВАНИЕ КОМПОНЕНТА В ЭКСПЛУАТАЦИИ</title>
+							<para>Обслуживание компонента в эксплуатации осуществлять по технологическим картам (ТК), приведенным в Табл. 1.</para>
+							<table frame="all" id="TABRRJСMM284205001A01R_asd2ata12">
+								<title>Перечень технологических карт</title>
+								<tgroup cols="3">
+									<asd2ataColspecs/>
+									<tbody>
+										<row>
+											<entry><para>Номер ТК</para></entry>
+											<entry><para>Наименование</para></entry>
+											<entry><para>Задача</para></entry>
+										</row>
+!!!										<asd2ataRows/>
+									</tbody>
+								</tgroup>
+							</table>
+						</prcitem>
+					</prcitem1>
+				</prclist1>
+			</pgblk>
+		</subject>
+	</section>
+	<section asd2ata="mainten" chapnbr="$chapnbr" sectnbr="$sectnbr" chg="N" key="SECRRJСMM2843A01R" revdate="$revdate">
+		<title>$bookname</title>
+		<subject chapnbr="$chapnbr" sectnbr="$sectnbr" subjnbr="$subjnbr" chg="N" key="SUBRRJСMM284305A01R" revdate="$revdate">
+			<title>$bookname</title>
+			<!-- 
+			Содержимое следующего ниже элемента PGBLK применяется как шаблон для каждого включенного в исходный пакет файла по S1000DD, имеющего infoCode в пределах 200~933 включительно.
+			Содержимое такого файла соответственно становится значением переменной $currentDocument.
+			-->
+			<pgblk chapnbr="$chapnbr" sectnbr="$sectnbr" subjnbr="$subjnbr" pgblknbr="$pgblknbr" chg="N" key="PB6RRJСMM284305A01R" revdate="$revdate">
+!!!				<effect/>
+				<title>Технология обслуживания</title>
+				<task chapnbr="$chapnbr" sectnbr="$sectnbr" subjnbr="$subjnbr" func="210" seq="801" pgblknbr="$pgblknbr" chg="N" key="TSKRRJСMM284305210801A01R" revdate="$revdate">
+					<effect efftext=""/>
+					<title>
+					<!-- 
+						Результат выполнения запроса
+						$currentDocument//content/refs/dmRef/dmRefAddressItems/dmTitle/infoName 
+					-->
+					</title>
+					<tfmatr>
+						<pretopic>
+							<title>Основание для выполнения работы</title>
+							<!-- 
+								Результат выполнения запроса
+								$currentDocument//procedure/commonInfo/commonInfoDescrPara 
+								с парсингом в соответствии с правилами, изложенными в разделе asd2ataRecursive
+							-->
+						</pretopic>
+						<pretopic>
+							<title>Материально-техническое обеспечение</title>
+							<list1>
+								<l1item>
+									<para>Ссылки</para>
+									<table id="TABRRJСMM284305210801001A01R">
+										<tgroup cols="2">
+											<asd2ataColspecs/>
+											<thead>
+												<row>
+													<entry><para>Номер</para></entry>
+													<entry><para>Наименование</para></entry>
+												</row>
+											</thead>
+											<tbody>
+											<!-- 
+												Правила конвертации атрибутов dmCode в обозначение публикации см. в конце данного файла
+												
+												$currentFragment = $currentDocument//content/refs/dmRef
+												
+												для каждого $currentFragment
+												<row>
+													<entry><para>./dmRefIdent/dmCode</para></entry>
+													<entry>concat(.//techNam, ' — ', .//infoName)</entry>
+												</row>
+											-->
+											</tbody>
+										</tgroup>
+									</table>
+								</l1item>
+								<l1item>
+									<para>Персонал</para>
+									<table id="TABRRJСMM284305210801004A01R">
+										<tgroup cols="3">
+											<asd2ataColspecs/>
+											<thead>
+												<row>
+													<entry><para>Специалист</para></entry>
+													<entry><para>Категория</para></entry>
+													<entry><para>Трудоемкость</para></entry>
+												</row>
+											</thead>
+											<tbody>
+											<!-- 
+												Выражения XPath сформированы на основании схемы; в присланных XML по SD1000D соответствующие фрагменты отсутствуют
+												
+												$currentFragment = $currentDocument//procedure/preliminaryRqmts/reqPersons
+												
+												для каждого $currentFragment
+												<row>
+													<entry><para>./person/trade</para></entry>
+													<entry><para>
+														./person/personCategory/@personCategoryCode
+														либо:
+														./person/personSkill/@skillLevelCode
+														либо: конкатенация первого и второго
+													</para></entry>
+													<entry><para>./person/estimatedTime</para></entry>
+												</row>
+											-->
+											</tbody>
+										</tgroup>
+									</table>
+								</l1item>
+								<l1item>
+									<para>Инструменты</para>
+									<table id="TABRRJСMM284305210801002A01R">
+										<tgroup cols="4">
+											<asd2ataColspecs/>
+											<thead>
+												<row>
+													<entry><para>Обозначение</para></entry>
+													<entry><para>Наименование</para></entry>
+													<entry><para>Количество</para></entry>
+													<entry><para>Примечания</para></entry>
+												</row>
+											</thead>
+											<tbody>
+											<!-- 
+												$currentFragment = $currentDocument//procedure/preliminaryRqmts/reqSupportEquips/supportEquipDescrGroup/supportEquipDescr
+												
+												для каждого $currentFragment
+												<row>
+													<entry><para>./toolRef/@toolNumber</para></entry>
+													<entry><para>./name</para></entry>
+													<entry><para>./reqQuantity</para></entry>
+													<entry><para>./remarks</para></entry>
+												</row>
+											-->
+											</tbody>
+										</tgroup>
+									</table>
+								</l1item>
+								<l1item>
+									<para>Расходные материалы</para>
+									<table id="TABRRJСMM284305210801003A01R">
+										<tgroup cols="4">
+											<asd2ataColspecs/>
+											<thead>
+												<row>
+													<entry><para>Обозначение</para></entry>
+													<entry><para>Наименование</para></entry>
+													<entry><para>Количество</para></entry>
+													<entry><para>Примечания</para></entry>
+												</row>
+											</thead>
+											<tbody>
+											<!-- 
+												$currentFragment = $currentDocument//procedure/preliminaryRqmts/reqSupplies/supplyDescrGroup/supplyDescr
+												
+												не уверен, включать ли сюда запасные части: /dmodule/content/procedure/preliminaryRqmts/reqSpares
+												
+												для каждого $currentFragment
+												<row>
+													<entry><para>./partRef/@partNumberValue</para></entry>
+													<entry><para>./name</para></entry>
+													<entry><para>./reqQuantity</para></entry>
+													<entry><para>./remarks</para></entry>
+												</row>
+											-->
+											</tbody>
+										</tgroup>
+									</table>
+								</l1item>
+							</list1>
+						</pretopic>
+					</tfmatr>
+					<topic>
+						<title>Подготовительные работы</title>
+						<subtask chapnbr="$chapnbr" sectnbr="$sectnbr" subjnbr="$subjnbr" func="210" seq="801" pgblknbr="$pgblknbr" chg="N" key="SSKRRJСMM284305210801001A01R" revdate="$revdate">
+							<effect efftext=""/>
+							<list1>
+								<l1item>
+									<!--Фрагмент, на котором выполняется asd2ataRecursive:
+									$currentDocument//procedure/mainProcedure/proceduralStep[1]
+									либо:
+									$currentDocument//mainProcedure/proceduralStep[contains(title,'Подготовительные работы')]/child::*
+									-->
+								</l1item>
+							</list1>
+						</subtask>
+					</topic>
+					<topic>
+						<title>Технология работы</title>
+						<subtask chapnbr="$chapnbr" sectnbr="$sectnbr" subjnbr="$subjnbr" func="210" seq="801" alunqi="28" pgblknbr="$pgblknbr" chg="N" key="SSKRRJСMM284305210801001A01R" revdate="$revdate">
+							<effect efftext=""/>
+							<list1>
+								<l1item>
+									<!--Фрагмент, на котором выполняется asd2ataRecursive:
+									$currentDocument//procedure/mainProcedure/proceduralStep[2]
+									либо:
+									$currentDocument//mainProcedure/proceduralStep[contains(title,'Технология работы')]/child::*
+									-->
+								</l1item>
+							</list1>
+						</subtask>
+					</topic>
+					<topic>
+						<title>Заключительные работы</title>
+						<subtask chapnbr="$chapnbr" sectnbr="$sectnbr" subjnbr="$subjnbr" func="210" seq="801" pgblknbr="$pgblknbr" chg="N" key="SSKRRJСMM284305210801003A01R" revdate="$revdate">
+							<effect efftext=""/>
+							<list1>
+								<l1item>
+									<!--Фрагмент, на котором выполняется asd2ataRecursive:
+									$currentDocument//procedure/mainProcedure/proceduralStep[3]
+									либо:
+									$currentDocument//mainProcedure/proceduralStep[contains(title,'Заключительные работы')]/child::*
+									-->
+								</l1item>
+							</list1>
+						</subtask>
+					</topic>
+				</task>
+			</pgblk>
+		</subject>
+	</section>
+	<section asd2ata="catalogue" chapnbr="$chapnbr" sectnbr="$sectnbr" chg="N" key="" revdate="$revdate">
+		<title>$bookname</title>
+		<subject chapnbr="$chapnbr" sectnbr="$sectnbr" subjnbr="$subjnbr" chg="N" key="" revdate="$revdate">
+			<title>$bookname</title>
+			<pgblk chapnbr="$chapnbr" sectnbr="$sectnbr" subjnbr="$subjnbr" pgblknbr="$pgblknbr" chg="N" key="SDSRRJСMM284305A01R" revdate="$revdate">
+				<effect effrg="" efftext=""/>
+				<title/>
+				<prclist1>
+					<prcitem1>
+						<prcitem>
+							<title>КАТАЛОГ ДЕТАЛЕЙ И СБОРОЧНЫХ ЕДИНИЦ</title>
+							<table id="TABRRJСMM_">
+								<tgroup>
+									<asd2ataColspecs/>
+									<thead>
+										<row>
+											<entry><para>РИС. ПОЗ</para></entry>
+											<entry><para>ОБОЗНАЧЕНИЕ</para></entry>
+											<entry><para>НАИМЕНОВАНИЕ</para></entry>
+											<entry><para>ПРИМЕНЯЕМОСТЬ</para></entry>
+											<entry><para>КОЛ-ВО НА СБ. ЕД.</para></entry>
+										</row>
+									</thead>
+									<tbody>
+										<!-- 
+											$currentDocument = файл, имеющий infoCode="941"
+											
+											Ниже в отличие от псевдокода в других фрагментах приводится работающий код, тестировавшийся с использованием SaxonHE12-1J
+
+												{
+												let $applic := ($currentDocument//referencedApplicGroup/applic) 
+												for $currentFragment in $doc//catalogSeqNumber
+												return
+												<row>
+													<entry><para>{data($currentFragment/@item)}</para></entry>
+													<entry><para>{data($currentFragment/.//@partNumberValue)}</para></entry>
+													<entry><para>{data($currentFragment/.//descrForPart)}</para></entry>
+													<entry><para>{data($applic[@id = data($currentFragment/.//@applicRefIds)]//@applicPropertyValues)}</para></entry>
+													<entry><para>{data($currentFragment/.//quantityPerNextHigherAssy)}</para></entry>
+												</row>
+												}
+											-->
+									</tbody>
+								</tgroup>
+							</table>
+						</prcitem>
+					</prcitem1>
+				</prclist1>
+!!!				<graphic chg="N" key="GRARRJСMM_" revdate="$revdate">
+					<effect/>
+					<title></title>
+!!!					<sheet revdate="$revdate"/>
+				</graphic>
+			</pgblk>
+		</subject>
+	</section>
+</chapter>
+
+<!--
+asd2ataRecursive запускается при обнаружении элементов levelledPara и proceduralStep 1-го уровня вложенности относительно элементов description и mainProcedure соответственно (по схемам descript.xsd и proced.xsd соответственно).
+
+При наличии в XML-файле по ASD элемента //description/levelledPara создается элемент PRCLIST1, служащий контейнером для элемента PRCITEM1, в котором создается элемент PRCITEM, служащий контейнером для АТА представления ASD-элементов, отличных от levelledPara.
+При наличии элемента levelledPara, являющегося прямым потомком элемента //description/levelledPara, вместо элемента PRCITEM создается элемент PRCLIST2, служащий контейнером для элемента PRCITEM2, в котором создается элемент PRCITEM, служащий контейнером для АТА представления ASD-элементов, отличных от levelledPara. 
+При наличии следующих уровней вложенности (обозначим их как _N) элемента levelledPara вместо элемента PRCITEM создается элемент PRCLIST_N, служащий контейнером для элемента PRCITEM_N, в котором создается элемент PRCITEM, служащий контейнером для АТА представления ASD-элементов, отличных от levelledPara, и так далее. Максимальное значение _N, предусмотренное стандартом АТА, составляет 7.
+
+При наличии в XML-файле по ASD элемента //mainProcedure/proceduralStep создается элемент LIST1, служащий контейнером для элемента L1ITEM, 
+
+-->
